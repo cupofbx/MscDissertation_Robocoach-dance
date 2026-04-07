@@ -199,6 +199,12 @@ video, .output_canvas {
 .color-C { color: #808080; } 
 */
 /* 1. 基础样式复位 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   margin: 0;
@@ -343,4 +349,4 @@ video, .output_canvas {
 /* 8. 控件样式 */
 #refUpload { margin-bottom: 15px; }
 .mdc-button { margin-bottom: 15px; }
-.invisible { display: none !important; }
+.invisible { display: none ; }

@@ -23,7 +23,7 @@
 <body>
   <h1>Pose detection using MediaPipe</h1>
 
-  <section id="demos" class="invisible">
+  <section id="demos" style="display: none; opacity: 0;">
     <div class="main-container">
       
       <div class="stream-box">
@@ -60,7 +60,7 @@
     </div>
   </section>
 
-  <div id="result-modal" class="invisible" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: #1e1e1e; border: 2px solid #00e5ff; border-radius: 15px; z-index: 2000; padding: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.8); text-align: center;">
+  <div id="result-modal" style="display: none;position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: #1e1e1e; border: 2px solid #00e5ff; border-radius: 15px; z-index: 2000; padding: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.8); text-align: center;">
       <span id="close-modal" style="position: absolute; top: 10px; right: 15px; color: #888; cursor: pointer; font-size: 24px;">&times;</span>
       <h2 style="color: #00e5ff; margin-top: 10px;">训练报告</h2>
       <div id="final-score-val" style="font-size: 60px; color: gold; font-weight: 900; margin: 10px 0;">0</div>
