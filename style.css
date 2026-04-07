@@ -1,0 +1,346 @@
+/*
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #121212; 
+  color: #eeeeee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+h1 {
+  margin: 20px 0;
+  color: #00e5ff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+
+.main-container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap; 
+  gap: 20px;
+  width: 95%;
+  max-width: 1400px;
+  padding-bottom: 50px;
+}
+
+
+.stream-box {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  text-align: center;
+  flex: 1;
+  min-width: 480px; 
+}
+
+.stream-box h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #888;
+  font-size: 1.1rem;
+}
+
+
+#refUpload {
+  margin-bottom: 15px;
+  color: #bbb;
+}
+
+#webcamButton {
+  background-color: #007f8b !important;
+  margin-bottom: 15px;
+  transition: transform 0.2s;
+}
+
+#webcamButton:hover {
+  transform: scale(1.05);
+}
+
+
+.canvas-container {
+  position: relative; 
+  width: 640px; 
+  height: 480px; 
+  margin: 0 auto;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #333;
+}
+
+
+video, .output_canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; 
+}
+
+#webcam, #output_canvas {
+  transform: rotateY(180deg);
+}
+
+
+#countdown-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 120px;
+  font-weight: 900;
+  color: #ffeb3b; 
+  text-shadow: 0 0 30px rgba(0,0,0,0.8);
+  pointer-events: none; 
+  z-index: 100;
+  font-family: 'Arial Black', sans-serif;
+}
+
+#info-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  padding: 8px 0;
+  font-size: 16px;
+  z-index: 110;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+
+.invisible {
+  display: none; 
+}
+
+
+@media (max-width: 600px) {
+  .canvas-container {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4/3;
+  }
+  .stream-box {
+    min-width: 100%;
+  }
+}
+
+
+.video-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px; 
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+
+#webcam, #output_canvas {
+    width: 100%;     
+    height: auto;     
+    display: block;  
+}
+
+
+#output_canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 10;      
+    pointer-events: none; 
+}
+
+#grade-container {
+    position: absolute;
+    bottom: 50px;
+    right: 50px;
+    z-index: 100;
+    pointer-events: none; 
+}
+
+
+#grade-text {
+    font-size: 80px;
+    font-weight: 900;
+    font-style: italic;
+    font-family: 'Arial Black', sans-serif;
+    display: block;
+    opacity: 0; 
+    text-shadow: 3px 3px 0px rgba(0,0,0,0.2); 
+}
+
+
+.animate-grade {
+    animation: gradeEffect 1.2s ease-out forwards;
+}
+
+@keyframes gradeEffect {
+    0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+    15% { opacity: 1; transform: scale(1.2) rotate(5deg); }
+    30% { opacity: 1; transform: scale(1) rotate(0deg); }
+    70% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-50px) scale(0.8); }
+}
+
+
+.color-S { color: #FFD700; text-shadow: 0 0 20px #FFD700; } 
+.color-A { color: #00FF7F; } 
+.color-B { color: #1E90FF; } 
+.color-C { color: #808080; } 
+*/
+/* 1. 基础样式复位 */
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #121212;
+  color: #eeeeee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+h1 {
+  margin: 20px 0;
+  color: #00e5ff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* 2. 主容器 */
+.main-container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 95%;
+  max-width: 1400px;
+  padding-bottom: 50px;
+}
+
+/* 3. 视频区块 */
+.stream-box {
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  text-align: center;
+  flex: 1;
+  min-width: 480px;
+}
+
+/* 4. 核心：视频画布容器 */
+.canvas-container {
+  position: relative; /* 子元素绝对定位的基准 */
+  width: 640px; 
+  height: 480px; 
+  margin: 0 auto;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #333;
+}
+
+/* 5. 视频与画布通用样式 */
+video, .output_canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* 保证比例一致，不会错位 */
+}
+
+/* 参考视频层级 */
+#referenceVideo { z-index: 1; }
+#ref_canvas { z-index: 10; pointer-events: none; }
+
+/* 实时视频层级与镜像 */
+#webcam { 
+  z-index: 1; 
+  transform: rotateY(180deg); 
+}
+#output_canvas { 
+  z-index: 10; 
+  transform: rotateY(180deg); 
+  pointer-events: none; 
+}
+
+/* 6. UI 反馈层 (最高层级) */
+#info-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 20;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  padding: 10px 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+#countdown-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  font-size: 120px;
+  font-weight: 900;
+  color: #ffeb3b;
+  text-shadow: 0 0 30px rgba(0,0,0,0.8);
+  pointer-events: none;
+  font-family: 'Arial Black', sans-serif;
+}
+
+/* 7. 等级评价动画 */
+#grade-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 40;
+}
+
+#grade-text {
+  font-size: 100px;
+  font-weight: 900;
+  font-style: italic;
+  display: block;
+  opacity: 0;
+  text-shadow: 4px 4px 0px rgba(0,0,0,0.4);
+}
+
+.animate-grade {
+  animation: gradeEffect 1.2s ease-out forwards;
+}
+
+@keyframes gradeEffect {
+  0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+  15% { opacity: 1; transform: scale(1.2) rotate(5deg); }
+  30% { opacity: 1; transform: scale(1) rotate(0deg); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-50px) scale(0.8); }
+}
+
+/* 等级颜色 */
+.color-S { color: #FFD700; text-shadow: 0 0 20px #FFD700; }
+.color-A { color: #00FF7F; }
+.color-B { color: #1E90FF; }
+.color-MISS { color: #808080; }
+
+/* 8. 控件样式 */
+#refUpload { margin-bottom: 15px; }
+.mdc-button { margin-bottom: 15px; }
+.invisible { display: none !important; }
