@@ -73,7 +73,7 @@ video, .output_canvas {
 }
 #output_canvas { 
   z-index: 10; 
-  transform: rotateY(180deg); 
+  transform: rotateY(180deg);
   pointer-events: none; 
 }
 

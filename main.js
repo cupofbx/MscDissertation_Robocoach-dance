@@ -2,7 +2,7 @@ import {
     PoseLandmarker,
     FilesetResolver,
     DrawingUtils
-} from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.0";
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 const demosSection = document.getElementById("demos");
 
@@ -14,6 +14,8 @@ let refPoints = null;
 let livePoints = null;
 let appState = "IDLE"; 
 let isPredicting = false;// 这个变量用来防止 predictWebcam 被重复调用，导致多个循环同时运行
+let stableFrames = 0;      // 关键：用于平滑检测全身
+let evalFrameCounter = 0;  // 用于控制评分频率
 
 
 
@@ -190,123 +192,119 @@ referenceVideo.addEventListener('ended', () => {
 
 // 修改后的核心循环：串行执行防止死锁
 async function predictWebcam() {
-    // 1. 唯一性锁
-    if (isPredicting) return; 
-    // 如果是 FINISHED 状态，不执行推理，直接跳下一帧等待状态改变
-    if (appState === "FINISHED") {
-        window.requestAnimationFrame(predictWebcam);
+    if (isPredicting || appState === "FINISHED") {
+        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
         return;
     }
-
-    if (isPredicting) return;
-
     isPredicting = true;
 
     try {
         const now = performance.now();
 
-        // --- 1. 处理实时摄像头 ---
+        // --- 1. 实时摄像头处理 ---
         if (webcamRunning && video.currentTime !== lastVideoTime) {
             lastVideoTime = video.currentTime;
-
-            // 只有画布和视频宽高一致，骨架才能画在正确的位置
-            if (canvasElement.width !== video.videoWidth || canvasElement.height !== video.videoHeight) {
+            
+            // 自动对齐画布尺寸
+            if (canvasElement.width !== video.videoWidth) {
                 canvasElement.width = video.videoWidth;
                 canvasElement.height = video.videoHeight;
             }
-            // 必须 await，否则会丢帧
+
             const liveResult = await poseLandmarker.detectForVideo(video, now);
-            
-            if (liveResult.landmarks && liveResult.landmarks.length > 0) {
+            if (liveResult.landmarks && liveResult.landmarks[0]) {
                 livePoints = liveResult.landmarks[0];
                 
-                // 实时绘制摄像头骨架
+                // 绘制
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 drawingUtils.drawConnectors(livePoints, PoseLandmarker.POSE_CONNECTIONS);
                 drawingUtils.drawLandmarks(livePoints, { radius: 2 });
 
+                // 只有在对齐阶段才运行检测
                 if (appState === "ALIGNING") {
                     checkAlignment(livePoints);
                 }
             }
         }
 
-        // --- 2. 处理参考视频 ---
-        // 注意：这里去掉了多余的条件，只要在 SCANNING 就尝试更新视频骨架
+        // --- 2. 参考视频处理 ---
         if (appState === "SCANNING" && referenceVideo && !referenceVideo.paused) {
-            if (referenceVideo.currentTime > 0 && referenceVideo.currentTime !== lastRefTime) {
+            if (referenceVideo.currentTime !== lastRefTime) {
                 lastRefTime = referenceVideo.currentTime;
-                const refTimestamp = Math.floor(referenceVideo.currentTime * 1000); 
+                // 使用 performance.now() 规避时间戳倒流报错
+                const refResult = await refPoseLandmarker.detectForVideo(referenceVideo, now);
                 
-                // 关键：await 确保拿到结果再往下走
-                const refResult = await refPoseLandmarker.detectForVideo(referenceVideo, refTimestamp);
-                
-                if (refResult.landmarks && refResult.landmarks.length > 0) {
+                if (refResult.landmarks && refResult.landmarks[0]) {
                     refPoints = refResult.landmarks[0];
                     
-                    // 实时绘制参考视频骨架
-                    if (refCanvasCtx) {
-                        refCanvasCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
-                        refDrawingUtils.drawConnectors(refPoints, PoseLandmarker.POSE_CONNECTIONS);
-                        refDrawingUtils.drawLandmarks(refPoints, { radius: 2 });
+                    // 绘制参考骨架
+                    refCanvasCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
+                    refDrawingUtils.drawConnectors(refPoints, PoseLandmarker.POSE_CONNECTIONS);
+                    refDrawingUtils.drawLandmarks(refPoints, { radius: 2 });
+
+                    // --- 3. 评分同步触发 ---
+                    // 确保两边都有点才评分
+                    if (livePoints) {
+                        const liveNorm = normalizePoints(livePoints);
+                        if (liveNorm) {
+                            liveTimeWindow.push(liveNorm); 
+                            updateGradeLogic(refPoints); // 传入参考点
+                        }
                     }
                 }
             }
         }
-
-        // --- 3. 独立评分逻辑（这是解决 5 秒视频只有 2 个 MISS 的核心） ---
-        // 将它放在所有检测逻辑之外，只要有数据就疯狂累加 Buffer
-        if (appState === "SCANNING" && refPoints && livePoints) {
-            //calculateAndDisplayScore(refPoints, livePoints);
-            // A. 这一步代替了旧函数的“归一化”和“存入”动作
-            const liveNorm = normalizePoints(livePoints);
-            if (liveNorm) {
-                liveTimeWindow.push(liveNorm); 
-            }
-    
-            // B. 这一步代替了旧函数的“计算”和“显示”动作
-            // 注意：updateGradeLogic 内部现在自带 300ms 的冷却时间，不会卡画面了
-            updateGradeLogic(refPoints);
-        }
-
     } catch (error) {
-        console.error("MediaPipe Execution Error:", error);
+        console.error("推理循环出错:", error);
     } finally {
-        isPredicting = false; 
-    }
-
-    if (webcamRunning) {
-        window.requestAnimationFrame(predictWebcam);
+        isPredicting = false;
+        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
     }
 }
 
 function checkAlignment(points) {
-    // 1. 定义核心点位
-    const required = [0, 23, 24, 31, 32]; // 头, 左右胯, 左右脚
+    if (!points || points.length < 33) return;
+
+    // 1. 安全取点
+    const head = points[0];
+    const footL = points[31];
+    const footR = points[32];
+
+    if (!head || !footL || !footR) return;
+
+    // 2. 【核心修改】只看 Y 轴（高度），完全不管 X 轴（左右）
+    // 这样镜像 rotateY(180deg) 产生的左右颠倒就不会干扰判定了
     
-    // 2. 检查可见度
-    const isReady = required.every(idx => 
-        points[idx] && points[idx].visibility > 0.6
-    );
+    // 头在画面最上方 35% 区域
+    const isHeadTop = head.y < 0.35; 
+    
+    // 脚在画面下方（允许越界到 1.2），只要有一只脚在下面就算过
+    // 门槛设为 0.75，对应你刚才 log 里的 1.10 绰绰有余
+    const isFootBottom = (footL.y > 0.75 && footL.y < 1.3) || 
+                         (footR.y > 0.75 && footR.y < 1.3);
 
-    // 3. 根据检查结果执行动作
-    if (isReady) {
-        // 状态 A：全员进入画面
-        // 注意：这里统一调用 showUIFeedback，保持 UI 样式一致
-        showUIFeedback("Ready! Keep your pose...", "lime");
-
-        // 只有在 ALIGNING 状态下检测成功，才触发倒计时
-        // 这里的 appState 检查能防止 startDanceSession 被重复调用 100 次
-        if (appState === "ALIGNING") {
-            appState = "COUNTDOWN"; 
+    // 3. 判定与计数
+    if (isHeadTop && isFootBottom) {
+        stableFrames++;
+        
+        // 实时反馈：让你看到进度
+        showUIFeedback(`[已锁定] 保持住... ${Math.round(stableFrames/10*100)}%`, "lime");
+        
+        if (stableFrames > 10) {
+            console.log(">>> 环境校验通过，切换至倒计时！");
+            appState = "COUNTDOWN";
+            stableFrames = 0;
             startDanceSession(); 
         }
     } else {
-        // 状态 B：有人出屏了
-        showUIFeedback("Please show your full body (Head, Hips, Feet)", "white");
+        stableFrames = 0;
+        // 精准提示
+        let tip = "请对准：";
+        if (!isHeadTop) tip += " 头部太靠下 ";
+        if (!isFootBottom) tip += " 脚部未入镜 ";
+        showUIFeedback(tip, "white");
     }
 }
-
 
 // 倒计时函数
 function startDanceSession() {
@@ -339,34 +337,34 @@ function startDanceSession() {
  * @returns {Array} 归一化后的点坐标
  */
 function normalizePoints(landmarks) {
-    if (!landmarks || landmarks.length === 0) return null;
+    if (!landmarks || landmarks.length < 25) return null; // 确保至少有点
 
-    // 1. 找原点：左右胯的中心点
-    const midHipX = (landmarks[23].x + landmarks[24].x) / 2;
-    const midHipY = (landmarks[23].y + landmarks[24].y) / 2;
+    const lp = landmarks[23];
+    const rp = landmarks[24];
+    const ls = landmarks[11];
+    const rs = landmarks[12];
 
-    // 2. 找缩放基准：计算躯干长度 (肩膀中心到胯部中心)
-    const midShoulderX = (landmarks[11].x + landmarks[12].x) / 2;
-    const midShoulderY = (landmarks[11].y + landmarks[12].y) / 2;
+    // 如果关键参考点不可见，直接返回 null 停止本次计算
+    if (!lp || !rp || !ls || !rs) return null;
+
+    const midHipX = (lp.x + rp.x) / 2;
+    const midHipY = (lp.y + rp.y) / 2;
+    const midShoulderX = (ls.x + rs.x) / 2;
+    const midShoulderY = (ls.y + rs.y) / 2;
     
-    // 躯干长度 (欧式距离)
     const torsoSize = Math.sqrt(
         Math.pow(midShoulderX - midHipX, 2) + 
         Math.pow(midShoulderY - midHipY, 2)
     );
 
-    // 3. 归一化：所有点减去原点，再除以缩放基准
-    // 如果 torsoSize 太小（比如没拍全），给个默认值 1 防止报错
-    const scale = torsoSize > 0.1 ? torsoSize : 1.0;
+    const scale = torsoSize > 0.05 ? torsoSize : 1.0;
 
-    return landmarks.map(point => {
-        return {
-            x: (point.x - midHipX) / scale,
-            y: (point.y - midHipY) / scale,
-            z: point.z / scale, // Z 轴也同步缩放
-            visibility: point.visibility
-        };
-    });
+    return landmarks.map(point => ({
+        x: (point.x - midHipX) / scale,
+        y: (point.y - midHipY) / scale,
+        z: point.z / scale,
+        visibility: point.visibility
+    }));
 }
 
 // 辅助 UI 函数（记得在 HTML 里加这两个 ID）
@@ -474,46 +472,38 @@ function updateGradeLogic(currentSpatialError, forceFinal = false) { //得分敏
 let lastEvalTime = 0; // 确保在全局定义了这个变量
 
 function updateGradeLogic(refRaw, forceFinal = false) {
-    const now = performance.now();
-    
-    // 状态检查：如果不是正在扫描，也不是强制结算，且没到300ms，直接跳出
     if (appState !== "SCANNING" && !forceFinal) return;
-    if (!forceFinal && (now - lastEvalTime < 300)) return; 
 
-    // 只有满足条件才往下走
-    lastEvalTime = now;
+    // 帧频率控制：每 8 帧处理一次，避免 UI 闪烁过快
+    evalFrameCounter++;
+    if (evalFrameCounter < 8 && !forceFinal) return;
+    evalFrameCounter = 0;
 
-    // --- 核心计算搬家到这里 ---
-    // 1. 获取参考视频当前的归一化坐标
+    // 安全检查
     const refNorm = normalizePoints(refRaw);
     if (!refNorm) return;
 
-    // 2. 从窗口获取这 300-500ms 内的平均误差
     const keyIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-    // 调用我们之前定义的 liveTimeWindow 实例
     const avgWindowError = liveTimeWindow.getAverageError(refNorm, keyIndices);
 
-    // 3. 判定等级 (由于是平均值，门槛要放宽，否则全是 MISS)
+    // 如果误差是 999 说明窗口没数据
+    if (avgWindowError > 10) return;
+
     let grade;
     if (avgWindowError < 0.28) grade = "S";      
     else if (avgWindowError < 0.38) grade = "A"; 
     else if (avgWindowError < 0.48) grade = "B"; 
-    else grade = "C"; // C 对应 UI 上的 MISS
+    else grade = "C"; 
 
-    // 4. 更新统计数据 (对应你的 Report)
     totalEvals++;
     if (grade === "S") { totalS++; totalScorePoints += 100; }
     else if (grade === "A") { totalA++; totalScorePoints += 80; }
     else if (grade === "B") { totalB++; totalScorePoints += 60; }
-    else { totalMiss++; } // C 就是 MISS，计入 totalMiss
+    else { totalMiss++; } 
 
-    // 5. 触发右下角字母动画
     triggerGradeUI(grade);
-    
-    // 打印一下，方便你在控制台调试看误差到底是多少
-    console.log("Current Avg Error:", avgWindowError.toFixed(3), "Grade:", grade);
+    console.log(`Current Error: ${avgWindowError.toFixed(3)} | Grade: ${grade}`);
 }
-
 
 
 // 触发 UI 显示的函数
@@ -653,7 +643,12 @@ function updateUIState() {
     const webcamBtnLabel = document.getElementById("webcam-btn-text");
     const uploadInput = document.getElementById('refUpload');
 
-    if (!statusText || !webcamBtn) return;
+    // --- 方案 A 的核心：全方位防守 ---
+    // 只要有一个关键 UI 元素没加载好，就直接退出函数，不执行后面的 switch
+    if (!statusText || !webcamBtn || !webcamBtnLabel) {
+        console.warn("UI 元素尚未完全加载，等待中...");
+        return; 
+    }
 
     switch (appState) {
         case "IDLE":
@@ -673,17 +668,17 @@ function updateUIState() {
         case "ALIGNING":
             statusText.innerText = "请站远一点，确保全身入镜";
             webcamBtnLabel.innerText = "摄像头已开启";
-            uploadInput.disabled = false; // 允许中途换视频
+            if (uploadInput) uploadInput.disabled = false; 
             break;
 
         case "SCANNING":
             statusText.innerText = "正在练习：跟上节奏！";
-            uploadInput.disabled = true; // 练习中禁止换视频，防止崩溃
+            if (uploadInput) uploadInput.disabled = true; 
             break;
 
         case "FINISHED":
             statusText.innerText = "练习结束，查看下方报告";
-            uploadInput.disabled = false;
+            if (uploadInput) uploadInput.disabled = false;
             webcamBtnLabel.innerText = "再次开启";
             break;
     }
