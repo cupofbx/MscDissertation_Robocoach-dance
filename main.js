@@ -96,8 +96,6 @@ const createPoseLandmarker = async () => {
         numPoses: 1
     });
 
-    document.getElementById("demos").style.display = "block";
-
     demosSection.classList.remove("invisible");
     console.log("双模型实例初始化成功！");
 };
