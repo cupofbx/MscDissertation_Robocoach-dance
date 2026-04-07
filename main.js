@@ -1,8 +1,8 @@
 import {
-  PoseLandmarker,
-  FilesetResolver,
-  DrawingUtils
-} from "@mediapipe/tasks-vision";
+    PoseLandmarker,
+    FilesetResolver,
+    DrawingUtils
+} from "https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.0";
 
 const demosSection = document.getElementById("demos");
 
