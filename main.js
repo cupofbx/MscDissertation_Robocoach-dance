@@ -190,7 +190,8 @@ referenceVideo.addEventListener('ended', () => {
     console.log("舞曲结束，进入结算状态。");
 });
 
-// 修改后的核心循环：串行执行防止死锁
+// 修改后的核心循环：串行执行防止死锁-7.6
+/**
 async function predictWebcam() {
     if (isPredicting || appState === "FINISHED") {
         if (webcamRunning) window.requestAnimationFrame(predictWebcam);
@@ -249,6 +250,84 @@ async function predictWebcam() {
                         if (liveNorm) {
                             liveTimeWindow.push(liveNorm); 
                             updateGradeLogic(refPoints); // 传入参考点
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error("推理循环出错:", error);
+    } finally {
+        isPredicting = false;
+        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
+    }
+}
+*/
+
+let webcamFrameCount = 0;
+let refFrameCount = 0;
+
+async function predictWebcam() {
+    if (isPredicting || appState === "FINISHED") {
+        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
+        return;
+    }
+    isPredicting = true;
+
+    try {
+        const now = performance.now();
+
+        // --- 1. 实时摄像头处理 ---
+        if (webcamRunning && video.currentTime !== lastVideoTime) {
+            webcamFrameCount++;
+            // 【跳帧优化】：每 2 帧才让摄像头跑一次 AI 推理，算力直接省一半！
+            if (webcamFrameCount % 2 === 0) {
+                lastVideoTime = video.currentTime;
+                
+                if (canvasElement.width !== video.videoWidth) {
+                    canvasElement.width = video.videoWidth;
+                    canvasElement.height = video.videoHeight;
+                }
+
+                const liveResult = await poseLandmarker.detectForVideo(video, now);
+                if (liveResult.landmarks && liveResult.landmarks[0]) {
+                    livePoints = liveResult.landmarks[0];
+                    
+                    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                    drawingUtils.drawConnectors(livePoints, PoseLandmarker.POSE_CONNECTIONS);
+                    drawingUtils.drawLandmarks(livePoints, { radius: 2 });
+
+                    if (appState === "ALIGNING") {
+                        checkAlignment(livePoints);
+                    }
+                }
+            }
+        }
+
+        // --- 2. 参考视频处理 ---
+        if (appState === "SCANNING" && referenceVideo && !referenceVideo.paused) {
+            if (referenceVideo.currentTime !== lastRefTime) {
+                refFrameCount++;
+                // 【跳帧优化】：视频帧也每 2 帧跑一次推理
+                if (refFrameCount % 2 === 0) {
+                    lastRefTime = referenceVideo.currentTime;
+                    const refResult = await refPoseLandmarker.detectForVideo(referenceVideo, now);
+                    
+                    if (refResult.landmarks && refResult.landmarks[0]) {
+                        refPoints = refResult.landmarks[0];
+                        
+                        refCanvasCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
+                        refDrawingUtils.drawConnectors(refPoints, PoseLandmarker.POSE_CONNECTIONS);
+                        refDrawingUtils.drawLandmarks(refPoints, { radius: 2 });
+
+                        // --- 3. 评分同步触发 ---
+                        if (livePoints) {
+                            const liveNorm = normalizePoints(livePoints);
+                            if (liveNorm) {
+                                liveTimeWindow.push(liveNorm); 
+                                // 这里不再疯狂堆积，里面有绝对时间拦截（500ms）
+                                updateGradeLogic(refPoints); 
+                            }
                         }
                     }
                 }
@@ -470,7 +549,8 @@ function updateGradeLogic(currentSpatialError, forceFinal = false) { //得分敏
     */
 
 let lastEvalTime = 0; // 确保在全局定义了这个变量
-
+//7.6更改
+/** 
 function updateGradeLogic(refRaw, forceFinal = false) {
     if (appState !== "SCANNING" && !forceFinal) return;
 
@@ -504,7 +584,43 @@ function updateGradeLogic(refRaw, forceFinal = false) {
     triggerGradeUI(grade);
     console.log(`Current Error: ${avgWindowError.toFixed(3)} | Grade: ${grade}`);
 }
+    */
 
+function updateGradeLogic(refRaw, forceFinal = false) {
+    if (appState !== "SCANNING" && !forceFinal) return;
+
+    // 核心改动：不用 evalFrameCounter < 8 这种肉眼不可控的帧计数
+    // 改为基于真实时间戳：每 500 毫秒评一次分
+    const now = performance.now();
+    if (now - lastEvalTime < 500 && !forceFinal) return; 
+    lastEvalTime = now;
+
+    // 安全检查
+    const refNorm = normalizePoints(refRaw);
+    if (!refNorm) return;
+
+    const keyIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+    const avgWindowError = liveTimeWindow.getAverageError(refNorm, keyIndices);
+
+    // 如果误差是 999 说明窗口没数据
+    if (avgWindowError > 10) return;
+
+    let grade;
+    // 稍微放宽一点阈值，让人更容易得 S 和 A，增加游戏趣味性
+    if (avgWindowError < 0.32) grade = "S";      
+    else if (avgWindowError < 0.42) grade = "A"; 
+    else if (avgWindowError < 0.52) grade = "B"; 
+    else grade = "C"; 
+
+    totalEvals++;
+    if (grade === "S") { totalS++; totalScorePoints += 100; }
+    else if (grade === "A") { totalA++; totalScorePoints += 80; }
+    else if (grade === "B") { totalB++; totalScorePoints += 60; }
+    else { totalMiss++; } 
+
+    triggerGradeUI(grade);
+    console.log(`[打分触发] 实时误差: ${avgWindowError.toFixed(3)} | 等级: ${grade}`);
+}
 
 // 触发 UI 显示的函数
 function triggerGradeUI(grade) {
