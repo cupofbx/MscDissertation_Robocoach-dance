@@ -121,29 +121,6 @@ const refDrawingUtils = refCanvasCtx ? new DrawingUtils(refCanvasCtx) : null;
 const refUpload = document.getElementById('refUpload');
 
 // 3. 上传参考视频逻辑 状态机未完成版
-/**if (refUpload) {
-  refUpload.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      referenceVideo.src = url;
-      referenceVideo.load();
-      referenceVideo.onloadedmetadata = () => {
-        refCanvas.width = referenceVideo.videoWidth;
-        refCanvas.height = referenceVideo.videoHeight;
-      };
-    }
-    referenceVideo.onloadedmetadata = () => {
-        // 关键：上传成功后，状态切到 READY
-        appState = "READY_TO_WAKE";
-        updateUIState(); // 更新按钮状态
-        
-        refCanvas.width = referenceVideo.videoWidth;
-        refCanvas.height = referenceVideo.videoHeight;
-    };
-  });
-}
-  */
 
 if (refUpload) {
     refUpload.addEventListener('change', (e) => {
@@ -173,7 +150,7 @@ referenceVideo.addEventListener('ended', () => {
     // 1. 切换状态：停止评分逻辑
     appState = "FINISHED"; 
 
-    // 2. 关键微调：传入当前帧坐标进行“最后一次强制结算”
+    // 2. 传入当前帧坐标进行“最后一次强制结算”
     // 因为我们重写了 updateGradeLogic，它现在接收的是坐标数组（refPoints）
     // 传入当前的 refPoints，确保视频最后一秒的动作也被计入总分
     updateGradeLogic(refPoints, true); 
@@ -191,78 +168,6 @@ referenceVideo.addEventListener('ended', () => {
 });
 
 // 修改后的核心循环：串行执行防止死锁-7.6
-/**
-async function predictWebcam() {
-    if (isPredicting || appState === "FINISHED") {
-        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
-        return;
-    }
-    isPredicting = true;
-
-    try {
-        const now = performance.now();
-
-        // --- 1. 实时摄像头处理 ---
-        if (webcamRunning && video.currentTime !== lastVideoTime) {
-            lastVideoTime = video.currentTime;
-            
-            // 自动对齐画布尺寸
-            if (canvasElement.width !== video.videoWidth) {
-                canvasElement.width = video.videoWidth;
-                canvasElement.height = video.videoHeight;
-            }
-
-            const liveResult = await poseLandmarker.detectForVideo(video, now);
-            if (liveResult.landmarks && liveResult.landmarks[0]) {
-                livePoints = liveResult.landmarks[0];
-                
-                // 绘制
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                drawingUtils.drawConnectors(livePoints, PoseLandmarker.POSE_CONNECTIONS);
-                drawingUtils.drawLandmarks(livePoints, { radius: 2 });
-
-                // 只有在对齐阶段才运行检测
-                if (appState === "ALIGNING") {
-                    checkAlignment(livePoints);
-                }
-            }
-        }
-
-        // --- 2. 参考视频处理 ---
-        if (appState === "SCANNING" && referenceVideo && !referenceVideo.paused) {
-            if (referenceVideo.currentTime !== lastRefTime) {
-                lastRefTime = referenceVideo.currentTime;
-                // 使用 performance.now() 规避时间戳倒流报错
-                const refResult = await refPoseLandmarker.detectForVideo(referenceVideo, now);
-                
-                if (refResult.landmarks && refResult.landmarks[0]) {
-                    refPoints = refResult.landmarks[0];
-                    
-                    // 绘制参考骨架
-                    refCanvasCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
-                    refDrawingUtils.drawConnectors(refPoints, PoseLandmarker.POSE_CONNECTIONS);
-                    refDrawingUtils.drawLandmarks(refPoints, { radius: 2 });
-
-                    // --- 3. 评分同步触发 ---
-                    // 确保两边都有点才评分
-                    if (livePoints) {
-                        const liveNorm = normalizePoints(livePoints);
-                        if (liveNorm) {
-                            liveTimeWindow.push(liveNorm); 
-                            updateGradeLogic(refPoints); // 传入参考点
-                        }
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error("推理循环出错:", error);
-    } finally {
-        isPredicting = false;
-        if (webcamRunning) window.requestAnimationFrame(predictWebcam);
-    }
-}
-*/
 
 let webcamFrameCount = 0;
 let refFrameCount = 0;
@@ -455,36 +360,7 @@ function showUIFeedback(text, color) {
     }
 }
 
-// 5. 评分逻辑 修改后的函数，现在它与旧的 updateScoreUI 彻底脱钩了 旧的
-/** 
-function calculateAndDisplayScore(refRaw, liveRaw) {
-    // 1. 标准化两边的坐标
-    const refNorm = normalizePoints(refRaw);
-    const liveNorm = normalizePoints(liveRaw);
-
-    if (!refNorm || !liveNorm) return;
-
-    // 2. 选择核心点位进行误差计算
-    // 选了肩膀、肘、腕、胯、膝、踝，覆盖全身主要动作
-    const keyIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-    let totalDist = 0;
-
-    keyIndices.forEach(idx => {
-        // 计算欧几里得距离
-        const d = Math.sqrt(
-            Math.pow(refNorm[idx].x - liveNorm[idx].x, 2) +
-            Math.pow(refNorm[idx].y - liveNorm[idx].y, 2)
-        );
-        totalDist += d;
-    });
-
-    // 3. 计算平均误差 (avgDist)
-    const avgDist = totalDist / keyIndices.length;
-
-    // 4. 【关键小改动】直接把误差传给你的新系统
-    updateGradeLogic(avgDist); 
-}
-*/
+// 5. 评分逻辑 修改后的函数，现在它与旧的 updateScoreUI 彻底脱钩了
 
 function calculateAndDisplayScore(refRaw, liveRaw) {
     // 1. 依然要先做归一化
@@ -492,7 +368,7 @@ function calculateAndDisplayScore(refRaw, liveRaw) {
     const liveNorm = normalizePoints(liveRaw);
     if (!refNorm || !liveNorm) return;
 
-    // 2. 【核心改变】：将当前这一帧存入“时间桶”
+    // 2. 将当前这一帧存入“时间桶”
     liveTimeWindow.push(liveNorm);
 
     // 3. 计算这一秒钟内的平均误差
@@ -510,81 +386,9 @@ let totalScorePoints = 0;   // 用于计算百分比的总分
 let totalEvals = 0;        // 进行了多少次评价
 let totalS = 0, totalA = 0, totalB = 0, totalMiss = 0;
 
-/** 
-function updateGradeLogic(currentSpatialError, forceFinal = false) { //得分敏感性在这里调整
-    // 1. 只有非强制结算时才存入数据
-    if (!forceFinal) {
-        let grade;
-        if (currentSpatialError < 0.15) grade = "S";
-        else if (currentSpatialError < 0.25) grade = "A";
-        else if (currentSpatialError < 0.35) grade = "B";
-        else grade = "C";
-        scoreBuffer.push(grade);
-    }
 
-    // 2. 达到周期 OR 强制结算（视频结束）
-    if ((scoreBuffer.length >= EVAL_INTERVAL || forceFinal) && scoreBuffer.length > 0) {
-        const finalGrade = getMode(scoreBuffer);
-        
-        totalEvals++; // 总评价次数加 1
-        
-        // 不仅加总分，还要加各个等级的计数器
-        if (finalGrade === "S") {
-            totalS++; 
-            totalScorePoints += 100;
-        } else if (finalGrade === "A") {
-            totalA++; 
-            totalScorePoints += 80;
-        } else if (finalGrade === "B") {
-            totalB++; 
-            totalScorePoints += 60;
-        } else {
-            totalMiss++; // C 就是 MISS
-        }
-
-        triggerGradeUI(finalGrade);
-        scoreBuffer = []; 
-    }
-}
-    */
 
 let lastEvalTime = 0; // 确保在全局定义了这个变量
-//7.6更改
-/** 
-function updateGradeLogic(refRaw, forceFinal = false) {
-    if (appState !== "SCANNING" && !forceFinal) return;
-
-    // 帧频率控制：每 8 帧处理一次，避免 UI 闪烁过快
-    evalFrameCounter++;
-    if (evalFrameCounter < 8 && !forceFinal) return;
-    evalFrameCounter = 0;
-
-    // 安全检查
-    const refNorm = normalizePoints(refRaw);
-    if (!refNorm) return;
-
-    const keyIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-    const avgWindowError = liveTimeWindow.getAverageError(refNorm, keyIndices);
-
-    // 如果误差是 999 说明窗口没数据
-    if (avgWindowError > 10) return;
-
-    let grade;
-    if (avgWindowError < 0.28) grade = "S";      
-    else if (avgWindowError < 0.38) grade = "A"; 
-    else if (avgWindowError < 0.48) grade = "B"; 
-    else grade = "C"; 
-
-    totalEvals++;
-    if (grade === "S") { totalS++; totalScorePoints += 100; }
-    else if (grade === "A") { totalA++; totalScorePoints += 80; }
-    else if (grade === "B") { totalB++; totalScorePoints += 60; }
-    else { totalMiss++; } 
-
-    triggerGradeUI(grade);
-    console.log(`Current Error: ${avgWindowError.toFixed(3)} | Grade: ${grade}`);
-}
-    */
 
 function updateGradeLogic(refRaw, forceFinal = false) {
     if (appState !== "SCANNING" && !forceFinal) return;
