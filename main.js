@@ -99,7 +99,7 @@ const createPoseLandmarker = async () => {
     });
 
     demosSection.classList.remove("invisible");
-    console.log("双模型实例初始化成功！");
+    console.log("Double model instance initialization successful！");
 };
 
 // 执行初始化
@@ -140,7 +140,7 @@ if (refUpload) {
                 appState = "READY_TO_WAKE";
                 if (typeof updateUIState === "function") updateUIState(); 
                 
-                console.log("视频加载完成，状态：READY_TO_WAKE");
+                console.log("Video loading complete, status:READY_TO_WAKE");
             };
         }
     });
@@ -239,7 +239,7 @@ async function predictWebcam() {
             }
         }
     } catch (error) {
-        console.error("推理循环出错:", error);
+        console.error("Inference loop error:", error);
     } finally {
         isPredicting = false;
         if (webcamRunning) window.requestAnimationFrame(predictWebcam);
@@ -272,10 +272,10 @@ function checkAlignment(points) {
         stableFrames++;
         
         // 实时反馈：让你看到进度
-        showUIFeedback(`[已锁定] 保持住... ${Math.round(stableFrames/10*100)}%`, "lime");
+        showUIFeedback(`[Locked] Hold on... ${Math.round(stableFrames/10*100)}%`, "lime");
         
         if (stableFrames > 10) {
-            console.log(">>> 环境校验通过，切换至倒计时！");
+            console.log(">>> Environment validation passed, switching to countdown!");
             appState = "COUNTDOWN";
             stableFrames = 0;
             startDanceSession(); 
@@ -283,9 +283,9 @@ function checkAlignment(points) {
     } else {
         stableFrames = 0;
         // 精准提示
-        let tip = "请对准：";
-        if (!isHeadTop) tip += " 头部太靠下 ";
-        if (!isFootBottom) tip += " 脚部未入镜 ";
+        let tip = "Please aim precisely:";
+        if (!isHeadTop) tip += " The head is positioned too low ";
+        if (!isFootBottom) tip += " The feet are not in the frame ";
         showUIFeedback(tip, "white");
     }
 }
@@ -423,7 +423,7 @@ function updateGradeLogic(refRaw, forceFinal = false) {
     else { totalMiss++; } 
 
     triggerGradeUI(grade);
-    console.log(`[打分触发] 实时误差: ${avgWindowError.toFixed(3)} | 等级: ${grade}`);
+    console.log(`[Grade Triggered] Real-time Error: ${avgWindowError.toFixed(3)} | Grade: ${grade}`);
 }
 
 // 触发 UI 显示的函数
@@ -488,7 +488,7 @@ function resetSession() {//评分数据清零
     // 5. 隐藏结果框
     document.getElementById("result-modal").classList.add("invisible");
     
-    console.log("会话已重置，请重新对齐关键点");
+    console.log("Session reset, please realign the key points");
     // 强制隐藏打分字母
     const gradeText = document.getElementById("grade-text");
     if (gradeText) gradeText.style.opacity = "0";
@@ -566,40 +566,40 @@ function updateUIState() {
     // --- 方案 A 的核心：全方位防守 ---
     // 只要有一个关键 UI 元素没加载好，就直接退出函数，不执行后面的 switch
     if (!statusText || !webcamBtn || !webcamBtnLabel) {
-        console.warn("UI 元素尚未完全加载，等待中...");
+        console.warn("UI elements not fully loaded, waiting...");
         return; 
     }
 
     switch (appState) {
         case "IDLE":
-            statusText.innerText = "Step 1: 上传参考视频";
+            statusText.innerText = "Step 1: Upload the reference video";
             webcamBtn.disabled = true;
             webcamBtn.style.opacity = "0.5";
-            webcamBtnLabel.innerText = "等待上传...";
+            webcamBtnLabel.innerText = "Waiting for upload...";
             break;
 
         case "READY_TO_WAKE":
-            statusText.innerText = "Step 2: 开启摄像头";
+            statusText.innerText = "Step 2: Enable Webcam";
             webcamBtn.disabled = false;
             webcamBtn.style.opacity = "1";
-            webcamBtnLabel.innerText = "开启摄像头";
+            webcamBtnLabel.innerText = "Enable Webcam";
             break;
 
         case "ALIGNING":
-            statusText.innerText = "请站远一点，确保全身入镜";
-            webcamBtnLabel.innerText = "摄像头已开启";
+            statusText.innerText = "Please stand further away and ensure your whole body is in the frame";
+            webcamBtnLabel.innerText = "Webcam is enabled";
             if (uploadInput) uploadInput.disabled = false; 
             break;
 
         case "SCANNING":
-            statusText.innerText = "正在练习：跟上节奏！";
+            statusText.innerText = "Practicing: Keep up with the rhythm!";
             if (uploadInput) uploadInput.disabled = true; 
             break;
 
         case "FINISHED":
-            statusText.innerText = "练习结束，查看下方报告";
+            statusText.innerText = "Practice completed, please check the report below";
             if (uploadInput) uploadInput.disabled = false;
-            webcamBtnLabel.innerText = "再次开启";
+            webcamBtnLabel.innerText = "Enable Webcam";
             break;
     }
 }
@@ -609,7 +609,7 @@ window.addEventListener('load', () => {
     // 确保此时 appState 是 "IDLE"
     if (typeof updateUIState === "function") {
         updateUIState();
-        console.log("初始化成功：已锁定摄像头按钮，等待上传视频...");
+        console.log("Initialization successful: Webcam button locked, waiting for video upload...");
     }
 });
 //消灭 TypeScript 语法
